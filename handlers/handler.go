@@ -65,7 +65,8 @@ func Process(c *gin.Context, datastore *DataStore) {
 	case "SET":
 
 		if len(words) < 3 {
-			fmt.Println("Invalid SET command. Expected format: SET <key> <value> <expiry time>? <condition>?")
+			response.ErrorResponse(c, 400, "Invalid SET command. Expected format: SET <key> <value> <expiry time>? <condition>?", errors.New("invalid input"), nil)
+
 			return
 		}
 		key := words[1]
@@ -123,9 +124,22 @@ func Process(c *gin.Context, datastore *DataStore) {
 		fmt.Printf("SET command processed. Key: %s, Value: %s\n", key, value)
 
 	case "GET":
+		if len(words) !=2 {
+			response.ErrorResponse(c, 400, "Invalid GET command. Expected format: GET <key>", errors.New("invalid input"), nil)
+
+			return
+		}
+		key := words[1]
+		if _, exists := datastore.Data[key]; !exists {
+			response.ErrorResponse(c, 500, "Key does not exist. Cannot perform XX operation.", errors.New("internal error"), nil)
+			return
+		}
+		response.SuccessResponse(c, 200, "Data stored successfully", datastore.Data[key])
+
+
 
 	default:
-		response.ErrorResponse(c, 400, "Invalid SET command. Unknown parameter:", errors.New("invalid input"), words[0])
+		response.ErrorResponse(c, 400, "Invalid  command. Unknown parameter:", errors.New("invalid input"), words[0])
 		return
 
 	}
