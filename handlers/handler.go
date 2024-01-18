@@ -124,7 +124,7 @@ func Process(c *gin.Context, datastore *DataStore) {
 		fmt.Printf("SET command processed. Key: %s, Value: %s\n", key, value)
 
 	case "GET":
-		if len(words) !=2 {
+		if len(words) != 2 {
 			response.ErrorResponse(c, 400, "Invalid GET command. Expected format: GET <key>", errors.New("invalid input"), nil)
 
 			return
@@ -136,8 +136,49 @@ func Process(c *gin.Context, datastore *DataStore) {
 		}
 		response.SuccessResponse(c, 200, "Data stored successfully", datastore.Data[key])
 
+	case "QPUSH":
+		if len(words) < 3 {
+			response.ErrorResponse(c, 400, "Invalid QPUSH command. Expected format: QPUSH <key> <value...>", errors.New("invalid input"), nil)
+			return
+		}
+		key := words[1]
+		values := words[2:]
 
+		datastore.Mutex.Lock()
+		defer datastore.Mutex.Unlock()
 
+		if _, exists := datastore.Data[key]; !exists {
+			datastore.Data[key] = ""
+		}
+		//it will add the values into the queue worb by word and seperate by a space
+		datastore.Data[key] += strings.Join(values, " ") + " "
+		response.SuccessResponse(c, 200, "Values added to the queue successfully", key)
+		fmt.Printf("QPUSH command processed. Key: %s, Values: %v\n", key, values)
+
+	case "QPOP":
+		if len(words) != 2 {
+			response.ErrorResponse(c, 400, "Invalid QPOP command. Expected format: QPOP <key>", errors.New("invalid input"), nil)
+			return
+		}
+		key := words[1]
+
+		datastore.Mutex.Lock()
+		defer datastore.Mutex.Unlock()
+
+		if queue, exists := datastore.Data[key]; exists {
+			//seperating the words which are pushed into the queue
+			values := strings.Fields(queue)
+
+			if len(values) > 0 {
+				lastValue := values[len(values)-1]
+				//after retrieving the last join the remaining to the queue
+				datastore.Data[key] = strings.Join(values[:len(values)-1], " ")
+				response.SuccessResponse(c, 200, "Last value retrieved from the queue", lastValue)
+				return
+			}
+		}
+
+		response.SuccessResponse(c, 200, "Queue is empty or does not exist", nil)
 	default:
 		response.ErrorResponse(c, 400, "Invalid  command. Unknown parameter:", errors.New("invalid input"), words[0])
 		return
